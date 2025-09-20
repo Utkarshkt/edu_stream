@@ -1,27 +1,28 @@
+import 'dart:async';
 import 'dart:convert';
-
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../api/api_service.dart';
 
 class VideoService {
-  final ApiService _apiService = ApiService();
-  final FlutterSecureStorage _storage = FlutterSecureStorage();
+  static const String baseUrl = 'http://10.0.2.2:5000/api';
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  Future<Map<String, dynamic>> uploadVideo({
-    required String title,
-    required String description,
-    required String duration,
-    required String filePath,
-    required String courseId,
-    int order = 0,
-    bool isPreview = false,
-  }) async {
+  Future<http.StreamedResponse> uploadVideo(
+      File videoFile, {
+        required String title,
+        required String description,
+        required String duration,
+        required String courseId,
+        File? thumbnailFile,
+        required void Function(double) onProgress,
+      }) async {
     final token = await _storage.read(key: 'auth_token');
 
     var request = http.MultipartRequest(
       'POST',
-      Uri.parse('${ApiService.baseUrl}/videos/upload'),
+      Uri.parse('$baseUrl/videos/upload'),
     );
 
     request.headers['Authorization'] = 'Bearer $token';
@@ -31,22 +32,98 @@ class VideoService {
       'description': description,
       'duration': duration,
       'courseId': courseId,
-      'order': order.toString(),
-      'isPreview': isPreview.toString(),
     });
 
+    // Add video file
     request.files.add(await http.MultipartFile.fromPath(
       'video',
-      filePath,
+      videoFile.path,
+      contentType: MediaType('video', 'mp4'),
     ));
 
-    final response = await request.send();
-    final responseData = await response.stream.bytesToString();
+    // Add thumbnail file if provided
+    if (thumbnailFile != null) {
+      request.files.add(await http.MultipartFile.fromPath(
+        'thumbnail',
+        thumbnailFile.path,
+        contentType: MediaType('image', 'jpeg'),
+      ));
+    }
+
+    // Create a stream controller to track progress
+    final streamController = StreamController<List<int>>();
+    int totalBytes = 0;
+    int sentBytes = 0;
+
+    // Listen to the request stream to track progress
+    request.finalize().listen(
+          (data) {
+        sentBytes += data.length;
+        if (totalBytes > 0) {
+          final progress = (sentBytes / totalBytes) * 100;
+          onProgress(progress);
+        }
+        streamController.add(data);
+      },
+      onDone: streamController.close,
+      onError: streamController.addError,
+    );
+
+    // Get the total content length
+    totalBytes = await _getContentLength(request);
+
+    // Send the request
+    final response = await http.Response.fromStream(await request.send());
+
+    return http.StreamedResponse(
+      Stream.value(response.bodyBytes),
+      response.statusCode,
+      contentLength: response.contentLength,
+      headers: response.headers,
+      request: response.request,
+      isRedirect: response.isRedirect,
+      persistentConnection: response.persistentConnection,
+      reasonPhrase: response.reasonPhrase,
+    );
+  }
+
+  Future<int> _getContentLength(http.MultipartRequest request) async {
+    // Calculate the total content length
+    int length = 0;
+
+    // Add fields length
+    for (final field in request.fields.entries) {
+      length += '${field.key}=${field.value}'.length;
+    }
+
+    // Add files length
+    for (final file in request.files) {
+      if (file is http.MultipartFile) {
+        if (file.filename != null) {
+          length += file.length;
+        }
+      }
+    }
+
+    return length;
+  }
+
+  Future<String> getSignedUrl(String filename) async {
+    final token = await _storage.read(key: 'auth_token');
+    final response = await http.post(
+      Uri.parse('$baseUrl/videos/generate-signed-url'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: '{"filename": "$filename"}',
+    );
 
     if (response.statusCode == 200) {
-      return json.decode(responseData);
+      final data = json.decode(response.body);
+      return data['signedUrl'];
     } else {
-      throw Exception('Upload failed: ${response.statusCode}');
+      throw Exception('Failed to get signed URL');
     }
   }
 }

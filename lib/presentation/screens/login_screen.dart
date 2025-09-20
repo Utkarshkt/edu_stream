@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../data/models/course.dart';
+import '../../data/services/auth_service.dart';
 import '../providers/auth_provider.dart';
-import '../../app/routes.dart';
+
+final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -13,120 +14,46 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true;
+  String? _errorMessage;
 
   @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _emailController.text = 'admin@edustream.com';
+    _passwordController.text = 'admin123';
   }
 
   Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
-
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
-
-      print("Email entered: '${_emailController.text}'");
-      print("Password entered: '${_passwordController.text}'");
-      // simulate API login
-      final response = await _simulateApiLogin(
-        _emailController.text,
+      // Use the authProvider notifier instead of authService directly
+      final authNotifier = ref.read(authProvider.notifier);
+      await authNotifier.login(
+        _emailController.text.trim(),
         _passwordController.text,
       );
-      print("Login response: $response");
 
-      if (response['success']) {
-        final role = UserRole.values.firstWhere(
-              (e) => e.toString() == 'UserRole.${response['user']['role']}',
-          orElse: () => UserRole.student,
-        );
-
-        await ref.read(authProvider.notifier).login(
-          _emailController.text,
-          _passwordController.text,
-          role,
-        );
-
-        // ✅ Navigate to correct page after login
-        if (role == UserRole.admin) {
-          context.go(AppRoutes.adminUpload); // e.g. "/admin/upload"
-        } else {
-          context.go(AppRoutes.home); // e.g. "/home"
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login successful!')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: ${response['message']}')),
-        );
+      // Navigation will now be handled by the router's redirect logic
+      if (mounted) {
+        context.goNamed('home');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login error: $e')),
-      );
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
   }
-  Future<Map<String, dynamic>> _simulateApiLogin(
-      String email, String password) async {
-    await Future.delayed(const Duration(seconds: 1));
-
-    final trimmedEmail = email.trim();
-    final trimmedPassword = password.trim();
-
-    if (trimmedEmail == 'admin@edustream.com' && trimmedPassword == 'admin123') {
-      return {
-        'success': true,
-        'token': 'mock_jwt_admin',
-        'user': {
-          'id': 'user_001',
-          'email': trimmedEmail,
-          'name': 'Admin User',
-          'role': 'admin',
-        }
-      };
-    } else if (trimmedEmail == 'instructor@edustream.com' &&
-        trimmedPassword == 'instructor123') {
-      return {
-        'success': true,
-        'token': 'mock_jwt_instructor',
-        'user': {
-          'id': 'user_002',
-          'email': trimmedEmail,
-          'name': 'Instructor User',
-          'role': 'instructor',
-        }
-      };
-    } else if (trimmedEmail.isNotEmpty && trimmedPassword.isNotEmpty) {
-      return {
-        'success': true,
-        'token': 'mock_jwt_student',
-        'user': {
-          'id': 'user_003',
-          'email': trimmedEmail,
-          'name': 'Student User',
-          'role': 'student',
-        }
-      };
-    } else {
-      return {'success': false, 'message': 'Invalid email or password'};
-    }
-  }
-
 
   @override
   Widget build(BuildContext context) {
@@ -138,115 +65,97 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const FlutterLogo(size: 80),
-                const SizedBox(height: 20),
-                const Text(
-                  'EduStream',
+                // Logo and Title
+                FlutterLogo(size: 80),
+                SizedBox(height: 20),
+                Text(
+                  'Welcome to EduStream',
                   style: TextStyle(
-                    fontSize: 32,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2196F3),
+                    color: Colors.blue[800],
                   ),
                 ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Sign in to continue learning',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                SizedBox(height: 10),
+                Text(
+                  'Sign in to continue your learning journey',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
                 ),
-                const SizedBox(height: 40),
+                SizedBox(height: 40),
 
-                // Login form
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.email),
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Enter your email';
-                          }
-                          if (!value.contains('@')) {
-                            return 'Invalid email';
-                          }
-                          return null;
-                        },
+                // Email Field
+                TextField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.email),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                SizedBox(height: 20),
+
+                // Password Field
+                TextField(
+                  controller: _passwordController,
+                  decoration: const InputDecoration(
+                    labelText: 'Password',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                  obscureText: true,
+                ),
+                SizedBox(height: 30),
+
+                // Error Message
+                if (_errorMessage != null)
+                  Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                SizedBox(height: 10),
+
+                // Login Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[800],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock),
-                          suffixIcon: IconButton(
-                            icon: Icon(_obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                          ),
-                          border: const OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Enter your password';
-                          }
-                          if (value.length < 6) {
-                            return 'Password too short';
-                          }
-                          return null;
-                        },
+                    ),
+                    child: _isLoading
+                        ? CircularProgressIndicator(color: Colors.white)
+                        : Text(
+                      'Sign In',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                      const SizedBox(height: 30),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _login,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2196F3),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? const CircularProgressIndicator(
-                            valueColor:
-                            AlwaysStoppedAnimation(Colors.white),
-                          )
-                              : const Text('Sign In'),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
 
-                const SizedBox(height: 30),
-
-                // Demo credentials
-                const Card(
+                // Test Credentials
+                SizedBox(height: 20),
+                Card(
                   child: Padding(
-                    padding: EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(12.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Demo Credentials:',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16)),
-                        SizedBox(height: 10),
-                        Text('Admin: admin@edustream.com / admin123'),
-                        Text('Instructor: instructor@edustream.com / instructor123'),
-                        Text('Student: any email / any password (min 6 chars)'),
+                        Text('Test Credentials:', style: TextStyle(fontWeight: FontWeight.bold)),
+                        SizedBox(height: 8),
+                        Text('admin@edustream.com / admin123'),
+                        Text('student@edustream.com / student123'),
                       ],
                     ),
                   ),

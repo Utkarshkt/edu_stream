@@ -1,16 +1,22 @@
-import 'package:edu_stream/presentation/screens/login_screen.dart';
+import 'package:edu_stream/app/route_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../presentation/screens/home_screen.dart';
-import 'theme.dart';
 
-class EduStreamApp extends StatelessWidget {
+
+class EduStreamApp extends ConsumerWidget {
+  const EduStreamApp({super.key});
+
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final goRouter = ref.watch(goRouterProvider);
+
+    return MaterialApp.router(
       title: 'EduStream',
-      theme: appTheme,
-      home: const LoginScreen(),
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        fontFamily: 'Roboto',
+      ),
+      routerConfig: goRouter,
       debugShowCheckedModeBanner: false,
     );
   }

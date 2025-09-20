@@ -1,11 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../data/services/auth_service.dart';
 import '../../data/models/course.dart';
 
-final secureStorage = FlutterSecureStorage();
+final authServiceProvider = Provider<AuthService>((ref) {
+  return AuthService();
+});
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier();
+  final authService = ref.watch(authServiceProvider);
+  return AuthNotifier(authService);
 });
 
 class AuthState {
@@ -13,97 +16,124 @@ class AuthState {
   final String? userId;
   final UserRole role;
   final String? email;
-  final AppUser? user;
-  final String? authToken;
-  final DateTime? tokenExpiry;
+  final String? displayName;
+  final bool isLoading;
 
   AuthState({
-    required this.isLoggedIn,
+    this.isLoggedIn = false,
     this.userId,
     this.role = UserRole.student,
     this.email,
-    this.user,
-    this.authToken,
-    this.tokenExpiry,
+    this.displayName,
+    this.isLoading = false,
   });
 
-  bool get isTokenValid => tokenExpiry?.isAfter(DateTime.now()) ?? false;
-  bool get isAuthenticated => isLoggedIn && isTokenValid;
+  AuthState copyWith({
+    bool? isLoggedIn,
+    String? userId,
+    UserRole? role,
+    String? email,
+    String? displayName,
+    bool? isLoading,
+  }) {
+    return AuthState(
+      isLoggedIn: isLoggedIn ?? this.isLoggedIn,
+      userId: userId ?? this.userId,
+      role: role ?? this.role,
+      email: email ?? this.email,
+      displayName: displayName ?? this.displayName,
+      isLoading: isLoading ?? this.isLoading,
+    );
+  }
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier() : super(AuthState(isLoggedIn: false)) {
-    _loadStoredAuth();
+  final AuthService _authService;
+
+  AuthNotifier(this._authService) : super(AuthState()) {
+    _loadUserData();
   }
 
-  Future<void> _loadStoredAuth() async {
-    final token = await secureStorage.read(key: 'auth_token');
-    final expiry = await secureStorage.read(key: 'token_expiry');
-    final userData = await secureStorage.read(key: 'user_data');
-
-    if (token != null && expiry != null && userData != null) {
-      // TODO: Parse stored data and restore state
+  Future<void> _loadUserData() async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final userData = await _authService.getUser();
+      if (userData != null) {
+        state = AuthState(
+          isLoggedIn: true,
+          userId: userData['id'],
+          email: userData['email'],
+          displayName: userData['name'],
+          role: _parseUserRole(userData['role']),
+          isLoading: false,
+        );
+      } else {
+        state = state.copyWith(isLoading: false);
+      }
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
     }
   }
 
-  Future<void> login(String email, String password, UserRole role) async {
+  UserRole _parseUserRole(String role) {
+    switch (role) {
+      case 'admin':
+        return UserRole.admin;
+      case 'instructor':
+        return UserRole.instructor;
+      default:
+        return UserRole.student;
+    }
+  }
+
+  Future<void> login(String email, String password) async {
+    state = state.copyWith(isLoading: true);
     try {
-      final response = await _authenticateWithBackend(email, password);
+      final response = await _authService.login(email, password);
+      final userData = response['user'];
 
-      if (response['success']) {
-        await secureStorage.write(key: 'auth_token', value: response['token']);
-        await secureStorage.write(key: 'token_expiry', value: response['expiry'].toString());
-
-        final user = AppUser(
-          id: response['user']['id'],
-          email: email,
-          displayName: response['user']['name'],
-          role: UserRole.values.firstWhere(
-                (e) => e.toString() == 'UserRole.${response['user']['role']}',
-          ),
-          joinDate: DateTime.now(),
-        );
-
-        state = AuthState(
-          isLoggedIn: true,
-          userId: user.id,
-          role: user.role,
-          email: email,
-          user: user,
-          authToken: response['token'],
-          tokenExpiry: DateTime.parse(response['expiry']),
-        );
-      }
+      state = AuthState(
+        isLoggedIn: true,
+        userId: userData['id'],
+        email: userData['email'],
+        displayName: userData['name'],
+        role: _parseUserRole(userData['role']),
+        isLoading: false,
+      );
     } catch (e) {
-      throw Exception('Authentication failed: $e');
+      state = state.copyWith(isLoading: false);
+      rethrow;
+    }
+  }
+
+  Future<void> register(String email, String password, String name) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final response = await _authService.register(email, password, name);
+      final userData = response['user'];
+
+      state = AuthState(
+        isLoggedIn: true,
+        userId: userData['id'],
+        email: userData['email'],
+        //displayName: userData['name'],
+        role: _parseUserRole(userData['role']),
+        isLoading: false,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
     }
   }
 
   Future<void> logout() async {
-    await secureStorage.delete(key: 'auth_token');
-    await secureStorage.delete(key: 'token_expiry');
-    await secureStorage.delete(key: 'user_data');
-
-    state = AuthState(isLoggedIn: false);
-  }
-
-  /// 🔹 Mock backend authentication (replace with real API later)
-  Future<Map<String, dynamic>> _authenticateWithBackend(String email, String password) async {
-    await Future.delayed(const Duration(seconds: 1)); // simulate network delay
-
-    if (email == "test@example.com" && password == "123456") {
-      return {
-        "success": true,
-        "token": "fake_jwt_token_123",
-        "expiry": DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
-        "user": {
-          "id": "u123",
-          "name": "Test User",
-          "role": "student",
-        }
-      };
-    } else {
-      throw Exception("Invalid credentials");
+    state = state.copyWith(isLoading: true);
+    try {
+      await _authService.logout();
+      state = AuthState(isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      rethrow;
     }
   }
 }

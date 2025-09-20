@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/app_providers.dart';
+import '../../providers/auth_provider.dart';
 import '../../screens/downloals_screen.dart';
+import '../../screens/login_screen.dart';
 import '../../screens/my_courses_screen.dart';
 
 class AppDrawer extends ConsumerWidget {
@@ -137,7 +140,7 @@ class _DrawerMenuItems extends ConsumerWidget {
             isSelected: selectedIndex == 2,
             onTap: () {
               ref.read(selectedCategoryProvider.notifier).state = 2;
-
+              Navigator.pop(context);
             },
           ),
           _DrawerMenuItem(
@@ -175,7 +178,27 @@ class _DrawerMenuItems extends ConsumerWidget {
             icon: Icons.logout_rounded,
             title: 'Sign Out',
             isLogout: true,
-            onTap: () => Navigator.pop(context),
+            onTap: () async {
+              Navigator.pop(context); // Close the drawer first
+
+              try {
+                // Perform logout
+                final authNotifier = ref.read(authProvider.notifier);
+                await authNotifier.logout();
+
+                // FORCE navigation to login screen - clear everything
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => LoginScreen()),
+                      (route) => false, // This removes ALL previous routes
+                );
+              } catch (e) {
+                // If logout fails, still go to login page
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => LoginScreen()),
+                      (route) => false,
+                );
+              }
+            },
           ),
         ],
       ),

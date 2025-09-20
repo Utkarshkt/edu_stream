@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/app_providers.dart';
+import '../../providers/auth_provider.dart';
 
 class AppHeader extends ConsumerWidget {
   const AppHeader({Key? key}) : super(key: key);
@@ -28,7 +29,28 @@ class AppHeader extends ConsumerWidget {
           _buildSearchBar(ref),
           const SizedBox(width: 16),
           _buildUserProfile(),
-        ],
+        //   if (authState.isLoggedIn) ...[
+        //     Spacer(),
+        //     Text(
+        //       'Hello, ${authState.displayName ?? "User"}!',
+        //       style: TextStyle(color: Colors.white, fontSize: 14),
+        //     ),
+        //     SizedBox(width: 10),
+        //     IconButton(
+        //       icon: Icon(Icons.logout, color: Colors.white),
+        //       onPressed: () async {
+        //         try {
+        //           await ref.read(authProvider.notifier).logout();
+        //         } catch (e) {
+        //           ScaffoldMessenger.of(context).showSnackBar(
+        //             SnackBar(content: Text('Logout failed: $e')),
+        //           );
+        //         }
+        //       },
+        //     ),
+        //   ],
+        // ],
+         ],
       ),
     );
   }

@@ -5,5 +5,5 @@ import 'app/app.dart';
 void main() {
 
 
-  runApp(ProviderScope(child: EduStreamApp()));
+  runApp(const ProviderScope(child: EduStreamApp()));
 }
