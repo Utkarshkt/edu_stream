@@ -9,7 +9,7 @@ class AuthService {
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  /// ----------------- LOGIN -----------------
+//login
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
       debugPrint('🔐 Attempting login for: $email');
@@ -37,7 +37,7 @@ class AuthService {
     }
   }
 
-  /// ----------------- REGISTER -----------------
+//register
   Future<Map<String, dynamic>> register(String email, String password, String name) async {
     try {
       debugPrint('📝 Attempting registration for: $email');
@@ -73,7 +73,7 @@ class AuthService {
     }
   }
 
-  /// ----------------- STORAGE HELPERS -----------------
+  //storage
   Future<void> _storeAuthData(Map<String, dynamic> data) async {
     try {
       await _storage.write(key: 'auth_token', value: data['token']);
@@ -92,7 +92,7 @@ class AuthService {
     };
   }
 
-  /// ----------------- UTILITIES -----------------
+//utilities
   Future<Map<String, dynamic>?> getUser() async {
     try {
       final userData = await _storage.read(key: 'user_data');
@@ -126,7 +126,7 @@ class AuthService {
     }
   }
 
-  /// ----------------- CONNECTION TEST -----------------
+//test
   Future<Map<String, dynamic>> testConnection() async {
     try {
       debugPrint('🔗 Testing connection to: $baseUrl');
