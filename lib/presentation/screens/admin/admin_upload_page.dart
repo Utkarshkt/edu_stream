@@ -1,10 +1,10 @@
 import 'dart:io';
-import 'dart:math'; // ADD THIS IMPORT
+import 'dart:math' as math; // FIXED: Added 'as math' to avoid conflict
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
-import '../../providers/video_provider.dart'; // MAKE SURE THIS PATH IS CORRECT
+import '../../../data/services/video_service.dart';
 
 class AdminUploadPage extends ConsumerStatefulWidget {
   const AdminUploadPage({super.key});
@@ -64,10 +64,8 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
         _initializeVideoPlayer();
       }
     } catch (e) {
-      // Store context locally to avoid async gap
-      final currentContext = context;
       if (!mounted) return;
-      ScaffoldMessenger.of(currentContext).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error picking video: $e')),
       );
     }
@@ -86,10 +84,8 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
         });
       }
     } catch (e) {
-      // Store context locally to avoid async gap
-      final currentContext = context;
       if (!mounted) return;
-      ScaffoldMessenger.of(currentContext).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error picking thumbnail: $e')),
       );
     }
@@ -107,20 +103,14 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
 
   Future<void> _uploadVideo() async {
     if (_selectedVideo == null) {
-      // Store context locally to avoid async gap
-      final currentContext = context;
-      if (!mounted) return;
-      ScaffoldMessenger.of(currentContext).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a video first')),
       );
       return;
     }
 
     if (_titleController.text.isEmpty) {
-      // Store context locally to avoid async gap
-      final currentContext = context;
-      if (!mounted) return;
-      ScaffoldMessenger.of(currentContext).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a title')),
       );
       return;
@@ -132,14 +122,16 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
     });
 
     try {
-      final videoProvider = ref.read(videoProviderProvider);
+      // **USE BACKEND API DIRECTLY** - Simple fix
+      final videoService = VideoService();
 
-      final response = await videoProvider.uploadVideo(
+      final result = await videoService.uploadVideoWithProgress(
         videoFile: _selectedVideo!,
-        thumbnailFile: _selectedThumbnail,
         title: _titleController.text,
         description: _descriptionController.text,
-        category: _categoryController.text,
+        durationInSeconds: 0, // You can calculate this later
+        courseId: _categoryController.text, // Using category as courseId
+        thumbnailFile: _selectedThumbnail,
         onProgress: (progress) {
           if (mounted) {
             setState(() {
@@ -151,23 +143,20 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
 
       if (!mounted) return;
 
-      // Store context locally to avoid async gap
-      final currentContext = context;
-      if (response.success) {
-        ScaffoldMessenger.of(currentContext).showSnackBar(
+      // Check if upload was successful
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Video uploaded successfully!')),
         );
         _resetForm();
       } else {
-        ScaffoldMessenger.of(currentContext).showSnackBar(
-          SnackBar(content: Text('Upload failed: ${response.message}')),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: ${result['message']}')),
         );
       }
     } catch (e) {
       if (!mounted) return;
-      // Store context locally to avoid async gap
-      final currentContext = context;
-      ScaffoldMessenger.of(currentContext).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
     } finally {
@@ -188,22 +177,36 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
       _categoryController.text = _categories.first;
       _videoController?.dispose();
       _videoController = null;
+      _uploadProgress = 0.0; // ADDED: Reset progress
     });
   }
 
+  // FIXED: Corrected _formatFileSize function
   String _formatFileSize(int bytes) {
     if (bytes <= 0) return '0 B';
-    const List<String> suffixes = ['B', 'KB', 'MB', 'GB'];
-    final i = (log(bytes) / log(1024)).floor();
-    return '${(bytes / pow(1024, i)).toStringAsFixed(1)} ${suffixes[i]}';
+
+    const suffixes = ['B', 'KB', 'MB', 'GB'];
+    final i = (math.log(bytes) / math.log(1024)).floor();
+
+    return '${(bytes / math.pow(1024, i)).toStringAsFixed(1)} ${suffixes[i]}';
   }
+
+  // Alternative simpler version (if you prefer):
+  /*
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+  */
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin - Upload Video'),
-        backgroundColor: Colors.blue[700], // FIXED: Changed 709 to 700
+        backgroundColor: Colors.blue[700],
         foregroundColor: Colors.white,
         actions: [
           if (_isUploading)
@@ -274,16 +277,16 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
               Row(
                 children: [
                   ElevatedButton(
-                    onPressed: _pickVideo,
+                    onPressed: _isUploading ? null : _pickVideo, // ADDED: Disable when uploading
                     child: const Text('Change Video'),
                   ),
                   const SizedBox(width: 12),
-                  if (_videoController != null)
+                  if (_videoController != null && _videoController!.value.isInitialized)
                     IconButton(
                       icon: Icon(
                         _videoController!.value.isPlaying ? Icons.pause : Icons.play_arrow,
                       ),
-                      onPressed: () {
+                      onPressed: _isUploading ? null : () { // ADDED: Disable when uploading
                         setState(() {
                           _videoController!.value.isPlaying
                               ? _videoController!.pause()
@@ -295,7 +298,7 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
               ),
             ] else
               ElevatedButton.icon(
-                onPressed: _pickVideo,
+                onPressed: _isUploading ? null : _pickVideo, // ADDED: Disable when uploading
                 icon: const Icon(Icons.video_library),
                 label: const Text('Select Video'),
                 style: ElevatedButton.styleFrom(
@@ -331,12 +334,12 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
               Row(
                 children: [
                   ElevatedButton(
-                    onPressed: _pickThumbnail,
+                    onPressed: _isUploading ? null : _pickThumbnail, // ADDED: Disable when uploading
                     child: const Text('Change Thumbnail'),
                   ),
                   const SizedBox(width: 12),
                   TextButton(
-                    onPressed: () {
+                    onPressed: _isUploading ? null : () { // ADDED: Disable when uploading
                       setState(() {
                         _selectedThumbnail = null;
                       });
@@ -347,7 +350,7 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
               ),
             ] else
               ElevatedButton.icon(
-                onPressed: _pickThumbnail,
+                onPressed: _isUploading ? null : _pickThumbnail, // ADDED: Disable when uploading
                 icon: const Icon(Icons.image),
                 label: const Text('Select Thumbnail'),
                 style: ElevatedButton.styleFrom(
@@ -380,6 +383,7 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                 filled: true,
               ),
               maxLength: 100,
+              enabled: !_isUploading, // ADDED: Disable when uploading
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
@@ -395,9 +399,11 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
                   child: Text(category),
                 );
               }).toList(),
-              onChanged: (value) {
+              onChanged: _isUploading ? null : (value) { // ADDED: Disable when uploading
                 if (value != null) {
-                  _categoryController.text = value;
+                  setState(() {
+                    _categoryController.text = value;
+                  });
                 }
               },
             ),
@@ -412,6 +418,7 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
               ),
               maxLines: 4,
               maxLength: 500,
+              enabled: !_isUploading, // ADDED: Disable when uploading
             ),
           ],
         ),
@@ -429,12 +436,18 @@ class _AdminUploadPageState extends ConsumerState<AdminUploadPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: _isUploading
-          ? const Row(
+          ? Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: Colors.white),
-          SizedBox(width: 12),
-          Text('Uploading...', style: TextStyle(fontSize: 16)),
+          CircularProgressIndicator(
+            value: _uploadProgress, // ADDED: Show progress value
+            color: Colors.white,
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Uploading... ${(_uploadProgress * 100).toStringAsFixed(1)}%', // IMPROVED: Show percentage
+            style: const TextStyle(fontSize: 16),
+          ),
         ],
       )
           : const Text(
