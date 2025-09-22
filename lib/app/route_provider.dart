@@ -5,12 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../data/models/course.dart';
 import '../presentation/providers/auth_provider.dart';
 import '../presentation/screens/admin/video_upload_screen.dart';
-import '../presentation/screens/admin/video_upload_screen.dart';
 import '../presentation/screens/home_screen.dart';
 import '../presentation/screens/login_screen.dart';
 import '../presentation/screens/register_screen.dart';
 import '../presentation/screens/admin/admin_upload_page.dart'; // FIXED IMPORT
-import '../presentation/screens/video_upload_screen.dart';
 import '../presentation/widgets/common/access_denied_screen.dart';
 import '../presentation/screens/splash_screen.dart';
 
@@ -20,17 +18,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final authState = ref.read(authProvider);
 
-      // If still loading, stay on current route
-      if (authState.isLoading) {
-        return null;
-      }
+      // Loading state: stay
+      if (authState.isLoading) return null;
 
-      // If not logged in and trying to access protected routes
+      // Not logged in, trying to access protected routes
       if (!authState.isLoggedIn && !_isAuthRoute(state.uri.toString())) {
         return AppRoutes.login;
       }
 
-      // If logged in and trying to access auth routes
+      // Logged in, trying to access auth routes
       if (authState.isLoggedIn && _isAuthRoute(state.uri.toString())) {
         return AppRoutes.home;
       }
@@ -38,33 +34,33 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      // Splash Screen
+      // Splash
       GoRoute(
         path: AppRoutes.splash,
         name: 'splash',
-        builder: (context, state) => const SplashScreen(),
+        builder: (_, __) => const SplashScreen(),
       ),
 
-      // Auth Routes
+      // Auth
       GoRoute(
         path: AppRoutes.login,
         name: 'login',
-        builder: (context, state) => const LoginScreen(),
+        builder: (_, __) => const LoginScreen(),
       ),
       GoRoute(
         path: AppRoutes.register,
         name: 'register',
-        builder: (context, state) => const RegisterScreen(),
+        builder: (_, __) => const RegisterScreen(),
       ),
 
-      // Main Routes (Protected)
+      // Home
       GoRoute(
         path: AppRoutes.home,
         name: 'home',
-        builder: (context, state) => const HomeScreen(),
+        builder: (_, __) => const HomeScreen(),
       ),
 
-      // Admin Routes (Protected)
+      // Admin Upload Page
       GoRoute(
         path: AppRoutes.adminUpload,
         name: 'admin-upload',
@@ -73,11 +69,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           if (!authState.isLoggedIn || authState.role != UserRole.admin) {
             return const AccessDeniedScreen();
           }
-          return const AdminUploadPage(); // FIXED: Changed to AdminUploadPage
+          return const AdminUploadPage();
         },
       ),
 
-      // Video Upload Route (for regular users)
+      // Regular User Video Upload
       GoRoute(
         path: AppRoutes.videoUpload,
         name: 'video-upload',
@@ -90,7 +86,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
     ],
-    errorBuilder: (context, state) => Scaffold(
+    errorBuilder: (_, state) => Scaffold(
       body: Center(
         child: Text('Page not found: ${state.error}'),
       ),
