@@ -18,15 +18,19 @@ class AuthState {
   final String? email;
   final String? displayName;
   final bool isLoading;
+  final String? name;
 
-  AuthState({
+  AuthState( {
     this.isLoggedIn = false,
     this.userId,
     this.role = UserRole.student,
     this.email,
     this.displayName,
     this.isLoading = false,
+    this.name,
   });
+
+
 
   AuthState copyWith({
     bool? isLoggedIn,

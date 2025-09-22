@@ -9,6 +9,7 @@ import '../widgets/home/navigation_tab_bar.dart';
 import '../../data/models/course.dart';
 import '../providers/app_providers.dart';
 import '../providers/auth_provider.dart';
+import '../../../app/routes.dart'; // ADD THIS IMPORT
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -116,9 +117,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final isAdmin = authState.role == UserRole.admin;
 
     return Scaffold(
-      drawer: AppDrawer(),
+      drawer: AppDrawer(
+        onAdminDashboard: isAdmin ? () => context.pushNamed('admin-dashboard') : null,
+      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -130,7 +134,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         child: SafeArea(
           child: Column(
             children: [
-              AppHeader(),
+              AppHeader(
+                onAdminPressed: isAdmin ? () => context.pushNamed('admin-dashboard') : null,
+              ),
+              if (isAdmin) _buildAdminQuickAccess(context),
               NavigationTabBar(
                 tabController: _tabController,
                 categories: categories,
@@ -145,12 +152,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   child: MainContent(
                     tabController: _tabController,
                     categories: categories,
+                    isAdmin: isAdmin,
+                    onAdminUpload: () => context.pushNamed('admin-upload'),
                   ),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAdminQuickAccess(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.admin_panel_settings, color: Colors.white, size: 20),
+          const SizedBox(width: 8),
+          const Text(
+            'Admin Access',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          const Spacer(),
+          TextButton(
+            onPressed: () => context.pushNamed('admin-dashboard'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            ),
+            child: const Text('Dashboard →'),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => context.pushNamed('admin-upload'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            ),
+            child: const Text('Upload →'),
+          ),
+        ],
       ),
     );
   }
