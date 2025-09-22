@@ -14,6 +14,7 @@ class AppRoutes {
 
   // Admin
   static const String adminUpload = '/admin/upload';
+  static const String videoUpload = '/upload';
   static const String adminDashboard = '/admin/dashboard';
 
   // Course

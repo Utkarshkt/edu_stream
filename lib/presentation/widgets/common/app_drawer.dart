@@ -1,270 +1,149 @@
+// lib/presentation/widgets/common/app_drawer.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../providers/app_providers.dart';
+import '../../../data/models/course.dart';
 import '../../providers/auth_provider.dart';
-import '../../screens/downloals_screen.dart';
-import '../../screens/login_screen.dart';
-import '../../screens/my_courses_screen.dart';
 
 class AppDrawer extends ConsumerWidget {
+  final VoidCallback? onAdminDashboard;
+
+  const AppDrawer({super.key, this.onAdminDashboard});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedCategory = ref.watch(selectedCategoryProvider);
+    final authState = ref.watch(authProvider);
+    final isAdmin = authState.role == UserRole.admin;
 
     return Drawer(
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF2196F3),
-              Color(0xFF21CBF3),
-              Color(0xFF4ECDC4),
-            ],
-          ),
-        ),
-        child: Column(
-          children: [
-            _DrawerHeader(),
-            Expanded(
-              child: _DrawerMenuItems(selectedIndex: selectedCategory),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DrawerHeader extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 200,
-      padding: EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: ListView(
+        padding: EdgeInsets.zero,
         children: [
-          Container(
+          DrawerHeader(
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: Offset(0, 5),
+              gradient: LinearGradient(
+                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.white,
+                  child: Text(
+                    authState.name?.substring(0, 1).toUpperCase() ?? 'U',
+                    style: TextStyle(
+                      color: Color(0xFF667eea),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  authState.name ?? 'User',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  authState.email ?? '',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 4),
+                Chip(
+                  label: Text(
+                    authState.role.name.toUpperCase(),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                    ),
+                  ),
+                  backgroundColor: Colors.black.withOpacity(0.3),
                 ),
               ],
             ),
-            child: CircleAvatar(
-              radius: 40,
-              backgroundColor: Colors.white,
+          ),
+          ListTile(
+            leading: Icon(Icons.home, color: Colors.blue[700]),
+            title: Text('Home'),
+            onTap: () {
+              Navigator.pop(context);
+              context.goNamed('home');
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.library_books, color: Colors.purple),
+            title: Text('My Courses'),
+            onTap: () {
+              Navigator.pop(context);
+              context.pushNamed('my-courses');
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.download, color: Colors.orange),
+            title: Text('Downloads'),
+            onTap: () {
+              Navigator.pop(context);
+              context.pushNamed('downloads');
+            },
+          ),
+          if (isAdmin) ...[
+            Divider(),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
               child: Text(
-                'A',
+                'ADMIN TOOLS',
                 style: TextStyle(
-                  fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2196F3),
+                  color: Colors.blue[700],
+                  fontSize: 12,
                 ),
               ),
             ),
-          ),
-          SizedBox(height: 15),
-          Text(
-            'Alex Johnson',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
+            ListTile(
+              leading: Icon(Icons.dashboard, color: Colors.blue),
+              title: Text('Dashboard'),
+              onTap: () {
+                Navigator.pop(context);
+                onAdminDashboard?.call();
+              },
             ),
-          ),
-          SizedBox(height: 5),
-          Text(
-            'alex.johnson@email.com',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 14,
+            ListTile(
+              leading: Icon(Icons.upload, color: Colors.green),
+              title: Text('Upload Content'),
+              onTap: () {
+                Navigator.pop(context);
+                context.pushNamed('admin-upload');
+              },
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DrawerMenuItems extends ConsumerWidget {
-  final int selectedIndex;
-
-  const _DrawerMenuItems({Key? key, required this.selectedIndex}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(30),
-          topRight: Radius.circular(30),
-        ),
-      ),
-      child: ListView(
-        padding: EdgeInsets.symmetric(vertical: 20),
-        children: [
-          _DrawerMenuItem(
-            icon: Icons.home_rounded,
-            title: 'Home',
-            isSelected: selectedIndex == 0,
-            onTap: () {
-              ref.read(selectedCategoryProvider.notifier).state = 0;
-              Navigator.pop(context);
-            },
-          ),
-          _DrawerMenuItem(
-            icon: Icons.book_rounded,
-            title: 'My Courses',
-            isSelected: selectedIndex == 1,
-            onTap: () {
-              ref.read(selectedCategoryProvider.notifier).state = 1;
-              Navigator.pop(context);
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => MyCoursesScreen()));
-            },
-          ),
-          _DrawerMenuItem(
-            icon: Icons.trending_up_rounded,
-            title: 'Trending',
-            isSelected: selectedIndex == 2,
-            onTap: () {
-              ref.read(selectedCategoryProvider.notifier).state = 2;
-              Navigator.pop(context);
-            },
-          ),
-          _DrawerMenuItem(
-            icon: Icons.bookmark_rounded,
-            title: 'Bookmarks',
-            onTap: () => Navigator.pop(context),
-          ),
-          _DrawerMenuItem(
-            icon: Icons.download_rounded,
-            title: 'Downloads',
+            ListTile(
+              leading: Icon(Icons.people, color: Colors.orange),
+              title: Text('User Management'),
+              onTap: () {
+                // Navigate to user management
+              },
+            ),
+          ],
+          Divider(),
+          ListTile(
+            leading: Icon(Icons.person, color: Colors.grey),
+            title: Text('Profile'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const DownloadsScreen()));
+              context.pushNamed('profile');
             },
           ),
-          _DrawerMenuItem(
-            icon: Icons.analytics_rounded,
-            title: 'Progress',
-            onTap: () => Navigator.pop(context),
-          ),
-          Divider(height: 30, thickness: 1, color: Colors.grey[300]),
-          _DrawerMenuItem(
-            icon: Icons.settings_rounded,
-            title: 'Settings',
-            onTap: () => Navigator.pop(context),
-          ),
-          _DrawerMenuItem(
-            icon: Icons.help_rounded,
-            title: 'Help & Support',
-            onTap: () => Navigator.pop(context),
-          ),
-          _DrawerMenuItem(
-            icon: Icons.logout_rounded,
-            title: 'Sign Out',
-            isLogout: true,
-            onTap: () async {
-              Navigator.pop(context); // Close the drawer first
-
-              try {
-                // Perform logout
-                final authNotifier = ref.read(authProvider.notifier);
-                await authNotifier.logout();
-
-                // FORCE navigation to login screen - clear everything
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => LoginScreen()),
-                      (route) => false, // This removes ALL previous routes
-                );
-              } catch (e) {
-                // If logout fails, still go to login page
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => LoginScreen()),
-                      (route) => false,
-                );
-              }
+          ListTile(
+            leading: Icon(Icons.logout, color: Colors.red),
+            title: Text('Logout'),
+            onTap: () {
+              ref.read(authProvider.notifier).logout();
+              context.goNamed('login');
             },
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _DrawerMenuItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final bool isSelected;
-  final bool isLogout;
-  final VoidCallback onTap;
-
-  const _DrawerMenuItem({
-    Key? key,
-    required this.icon,
-    required this.title,
-    this.isSelected = false,
-    this.isLogout = false,
-    required this.onTap,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: isSelected ? Color(0xFF2196F3).withOpacity(0.1) : null,
-      ),
-      child: ListTile(
-        leading: Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? Color(0xFF2196F3)
-                : isLogout
-                ? Color(0xFFFF6B6B).withOpacity(0.1)
-                : Colors.grey.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            icon,
-            color: isSelected
-                ? Colors.white
-                : isLogout
-                ? Color(0xFFFF6B6B)
-                : Colors.grey[600],
-            size: 22,
-          ),
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isSelected
-                ? Color(0xFF2196F3)
-                : isLogout
-                ? Color(0xFFFF6B6B)
-                : Colors.grey[800],
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            fontSize: 16,
-          ),
-        ),
-        onTap: onTap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }

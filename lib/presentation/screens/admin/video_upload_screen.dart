@@ -1,47 +1,110 @@
+// lib/presentation/screens/video_upload_screen.dart
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/video_provider.dart';
 
-class AdminUploadPage extends StatefulWidget {
+class VideoUploadScreen extends ConsumerStatefulWidget {
+  const VideoUploadScreen({super.key});
+
   @override
-  _AdminUploadPageState createState() => _AdminUploadPageState();
+  ConsumerState<VideoUploadScreen> createState() => _VideoUploadScreenState();
 }
 
-class _AdminUploadPageState extends State<AdminUploadPage> {
-  File? _video;
+class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  bool _isUploading = false;
 
-  Future<void> _pickVideo() async {
-    final picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() {
-        _video = File(picked.path);
-      });
-    }
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   Future<void> _uploadVideo() async {
-    if (_video == null) return;
-    // TODO: Send multipart request to backend
+    if (_titleController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a title')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      final videoProvider = ref.read(videoProviderProvider);
+
+      final response = await videoProvider.uploadVideo(
+        title: _titleController.text,
+        description: _descriptionController.text,
+        category: 'General', // Default category for regular users
+        onProgress: (progress) {
+          // Handle progress if needed
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Video uploaded successfully!')),
+        );
+        _titleController.clear();
+        _descriptionController.clear();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: ${response.message}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Upload Video")),
-      body: Center(
+      appBar: AppBar(
+        title: const Text('Upload Video'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _video == null
-                ? Text("No video selected")
-                : Text("Selected: ${_video!.path}"),
-            ElevatedButton(
-              onPressed: _pickVideo,
-              child: Text("Pick Video from Gallery"),
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                border: OutlineInputBorder(),
+              ),
             ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: _uploadVideo,
-              child: Text("Upload"),
+              onPressed: _isUploading ? null : _uploadVideo,
+              child: _isUploading
+                  ? const CircularProgressIndicator()
+                  : const Text('Upload Video'),
             ),
           ],
         ),

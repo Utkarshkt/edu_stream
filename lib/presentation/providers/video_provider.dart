@@ -1,37 +1,56 @@
+// lib/providers/video_provider.dart
+import 'dart:io';
+import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/models/course.dart';
 
-// Provider for managing video uploads
-final videoUploadProvider = StateNotifierProvider<VideoUploadNotifier, List<CourseVideo>>((ref) {
-  return VideoUploadNotifier();
-});
+class UploadResponse {
+  final bool success;
+  final String message;
+  final String? videoId;
 
-class VideoUploadNotifier extends StateNotifier<List<CourseVideo>> {
-  VideoUploadNotifier() : super([]);
+  UploadResponse({
+    required this.success,
+    required this.message,
+    this.videoId,
+  });
+}
 
-  void addVideo(CourseVideo video) {
-    state = [...state, video];
-  }
-
-  void removeVideo(String videoId) {
-    state = state.where((video) => video.id != videoId).toList();
-  }
-
-  void updateVideoProgress(String videoId, double progress) {
-    state = state.map((video) {
-      if (video.id == videoId) {
-        // For simulation, we'll just mark as uploaded when progress reaches 100%
-        return video.copyWith(
-          isUploaded: progress >= 100,
-        );
+class VideoProvider {
+  // Single method that handles both cases with optional parameters
+  Future<UploadResponse> uploadVideo({
+    required String title,
+    required String description,
+    required String category,
+    File? videoFile, // Make videoFile optional
+    File? thumbnailFile, // Make thumbnailFile optional
+    required Function(double) onProgress,
+  }) async {
+    try {
+      // Simulate upload process
+      for (int i = 0; i <= 100; i += 5) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        onProgress(i / 100);
       }
-      return video;
-    }).toList();
+
+      // Different success message based on whether a file was uploaded
+      final successMessage = videoFile != null
+          ? 'Video file uploaded successfully'
+          : 'Video uploaded successfully';
+
+      return UploadResponse(
+        success: true,
+        message: successMessage,
+        videoId: 'vid_${DateTime.now().millisecondsSinceEpoch}',
+      );
+    } catch (e) {
+      return UploadResponse(
+        success: false,
+        message: 'Upload failed: $e',
+      );
+    }
   }
 }
 
-// Provider for current upload progress
-final uploadProgressProvider = StateProvider<double>((ref) => 0.0);
-
-// Provider for selected course for upload
-final selectedCourseForUploadProvider = StateProvider<Course?>((ref) => null);
+final videoProviderProvider = Provider<VideoProvider>((ref) {
+  return VideoProvider();
+});
